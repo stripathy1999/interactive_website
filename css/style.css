@@ -1,0 +1,59 @@
+body {
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+    background-color: #f7f7f7;
+}
+
+.landing-page {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: linear-gradient(to bottom, #ffe4e1, #ff69b4);
+}
+
+.hello-text {
+    font-size: 4rem;
+    color: #ff1493;
+    text-align: center;
+}
+
+.avatar {
+    margin-top: 20px;
+}
+
+.avatar-img {
+    width: 150px;
+    height: auto;
+    animation: wave 5s infinite;
+}
+
+.scroll-content {
+    background-color: #f0f8ff;
+    padding: 20px;
+    height: 100vh;
+}
+
+#story1 {
+    padding: 50px;
+    text-align: center;
+    font-size: 2rem;
+    color: #ff69b4;
+}
+
+/* Sakura leaves animation placeholder */
+@keyframes fall {
+    0% { transform: translateY(0px) rotate(0deg); }
+    100% { transform: translateY(800px) rotate(360deg); }
+}
+
+.sakura {
+    position: absolute;
+    top: -50px;
+    width: 30px;
+    height: 30px;
+    background-image: url('assets/placeholder-sakura.png');
+    background-size: cover;
+    animation: fall 10s linear infinite;
+}
