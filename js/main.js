@@ -94,15 +94,14 @@ function initThreeJS() {
             const avatar = gltf.scene;
             avatar.position.set(-3.5, -1.3, 0); // Move further to the left
             avatar.scale.set(1.5, 1.5, 1.5);
-
-            // Correct the orientation if the head is turned backward
             avatar.rotation.set(0, 7, 0); // Adjust the rotation to face forward
 
-            // Set initial opacity to 0 and make materials transparent
+            // Set initial visibility and opacity
+            avatar.visible = false; // Make avatar initially invisible
             avatar.traverse(function (child) {
                 if (child.isMesh) {
                     child.material.transparent = true;
-                    child.material.opacity = 0;
+                    child.material.opacity = 0; // Start with opacity 0
                 }
             });
 
@@ -130,8 +129,11 @@ function initThreeJS() {
             // Start the animation loop
             animate();
 
-            // Add GSAP animation to fade in the avatar
+            // Add GSAP animation to fade in the avatar at the correct scroll point
             fadeInAvatar(avatar);
+
+            // Ensure avatar is correctly hidden or visible on initial load based on scroll position
+            handleInitialScrollPosition(avatar);
         },
         undefined,
         function (error) {
@@ -140,21 +142,79 @@ function initThreeJS() {
     );
 
     function fadeInAvatar(avatar) {
-        // Use GSAP to animate the avatar's opacity along with the overlay text
-        avatar.traverse(function (child) {
-            if (child.isMesh) {
-                gsap.to(child.material, {
-                    opacity: 1,
-                    duration: 1.5,
-                    scrollTrigger: {
-                        trigger: ".overlay",
-                        start: "top center",
-                        end: "center center",
-                        scrub: true,
+        // Use GSAP to animate the avatar's opacity and make it visible along with the overlay text
+        ScrollTrigger.create({
+            trigger: ".overlay",
+            start: "top center", // Avatar fade-in starts when overlay text starts to fade in
+            end: "center center",
+            scrub: true,
+            onEnter: () => {
+                console.log("ScrollTrigger: Entering overlay section, making avatar visible.");
+                avatar.visible = true; // Make avatar visible when entering the overlay section
+                avatar.traverse(function (child) {
+                    if (child.isMesh) {
+                        gsap.to(child.material, {
+                            opacity: 1,
+                            duration: 1.5,
+                            ease: "power1.inOut",
+                            onStart: () => console.log("Avatar fade-in started."),
+                            onComplete: () => console.log("Avatar fade-in complete."),
+                        });
+                    }
+                });
+            },
+            onLeaveBack: () => {
+                console.log("ScrollTrigger: Leaving overlay section back to intro, hiding avatar.");
+                avatar.traverse(function (child) {
+                    if (child.isMesh) {
+                        gsap.to(child.material, {
+                            opacity: 0,
+                            duration: 1,
+                            ease: "power1.inOut",
+                            onComplete: () => {
+                                avatar.visible = false; // Hide avatar after fade-out is complete
+                                console.log("Avatar fade-out complete, opacity set to 0, avatar hidden.");
+                            }
+                        });
                     }
                 });
             }
         });
+    }
+
+    function handleInitialScrollPosition(avatar) {
+        // Get current scroll position on page load
+        const scrollY = window.scrollY;
+
+        console.log("Initial scroll position:", scrollY);
+        console.log("Overlay offset top:", document.querySelector(".overlay").offsetTop);
+
+        // If the user is on the second section (overlay), make sure the avatar is handled properly
+        if (scrollY >= document.querySelector(".overlay").offsetTop) {
+            console.log("User loaded on overlay section, making avatar visible.");
+            avatar.visible = true;
+            avatar.traverse(function (child) {
+                if (child.isMesh) {
+                    gsap.to(child.material, {
+                        opacity: 1,
+                        duration: 1.5,
+                        ease: "power1.inOut",
+                        onStart: () => console.log("Avatar opacity fade-in started for initial load."),
+                        onComplete: () => console.log("Avatar opacity set to 1 for overlay section.")
+                    });
+                }
+            });
+        } else {
+            // If the user is on the first section, ensure avatar is hidden
+            console.log("User loaded on intro section, keeping avatar hidden.");
+            avatar.visible = false;
+            avatar.traverse(function (child) {
+                if (child.isMesh) {
+                    child.material.opacity = 0;
+                    console.log("Avatar opacity set to 0 for intro section.");
+                }
+            });
+        }
     }
 
     function animate() {
