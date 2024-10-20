@@ -1,35 +1,77 @@
-// Wait for the DOM to load
 document.addEventListener('DOMContentLoaded', () => {
-    // Fade out intro text
+    // Register GSAP plugins
+    gsap.registerPlugin(ScrollTrigger);
+
+    // Fade-in "Hello Sakshi" text on page load
+    gsap.fromTo(".intro-text", { opacity: 0 }, { opacity: 1, duration: 2 });
+
+    // Fade out the intro section on scroll
     gsap.to(".intro", {
         opacity: 0,
-        duration: 2,
-        delay: 3, // Keeps the intro visible for 3 seconds
-        onComplete: function() {
-            console.log("Intro faded out, showing landing page...");
-            document.getElementById("intro").style.display = "none"; // Hide the intro
-            document.querySelector(".landing-page").classList.remove("hidden"); // Show landing page
-            initThreeJS(); // Initialize Three.js scene
+        scrollTrigger: {
+            trigger: ".intro",
+            start: "top top",
+            end: "bottom top",
+            scrub: true,
+            onLeave: () => {
+                document.querySelector(".intro").style.display = "none";
+            },
+            onEnterBack: () => {
+                document.querySelector(".intro").style.display = "flex";
+            }
         }
     });
+
+    // Fade in the overlay content as you scroll
+    gsap.fromTo(".overlay", { opacity: 0 }, {
+        opacity: 1,
+        scrollTrigger: {
+            trigger: ".intro",
+            start: "bottom top",
+            end: "bottom+=50% top",
+            scrub: true,
+        }
+    });
+
+    // Fade in the overlay text
+    gsap.fromTo(".overlay h1", { opacity: 0 }, {
+        opacity: 1,
+        duration: 1,
+        scrollTrigger: {
+            trigger: ".overlay",
+            start: "top center",
+            end: "center center",
+            scrub: true,
+        }
+    });
+
+    gsap.fromTo(".overlay p", { opacity: 0 }, {
+        opacity: 1,
+        duration: 1,
+        scrollTrigger: {
+            trigger: ".overlay",
+            start: "center center",
+            end: "bottom center",
+            scrub: true,
+        }
+    });
+
+    // Initialize Three.js scene
+    initThreeJS();
 });
 
-// Three.js variables
-let scene, camera, renderer, avatar, mixer;
-
-// Initialize Three.js
 function initThreeJS() {
     // Scene
-    scene = new THREE.Scene();
+    const scene = new THREE.Scene();
 
     // Camera
-    camera = new THREE.PerspectiveCamera(
+    const camera = new THREE.PerspectiveCamera(
         75, window.innerWidth / window.innerHeight, 0.1, 1000
     );
     camera.position.z = 5;
 
     // Renderer
-    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), alpha: true });
+    const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('three-canvas'), alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.outputEncoding = THREE.sRGBEncoding;
@@ -38,121 +80,101 @@ function initThreeJS() {
     const ambientLight = new THREE.AmbientLight(0xffffff, 1);
     scene.add(ambientLight);
 
+    // Initialize clock
+    const clock = new THREE.Clock();
+
+    // Declare mixer variable in a scope accessible to animate function
+    let mixer;
+
     // Load Avatar Model
     const loader = new THREE.GLTFLoader();
-    loader.load('assets/avatar.glb', function(gltf) {
-        avatar = gltf.scene;
-        avatar.position.set(0, -1.5, 0);
-        avatar.scale.set(1.5, 1.5, 1.5);
-        scene.add(avatar);
+    loader.load(
+        'assets/avatar.glb',
+        function (gltf) {
+            const avatar = gltf.scene;
+            avatar.position.set(-3.5, -1.3, 0); // Move further to the left
+            avatar.scale.set(1.5, 1.5, 1.5);
 
-        // Animation Mixer
-        mixer = new THREE.AnimationMixer(avatar);
-        if (gltf.animations.length > 0) {
-            const action = mixer.clipAction(gltf.animations[0]);
-            action.play();
+            // Correct the orientation if the head is turned backward
+            avatar.rotation.set(0, 7, 0); // Adjust the rotation to face forward
+
+            // Set initial opacity to 0 and make materials transparent
+            avatar.traverse(function (child) {
+                if (child.isMesh) {
+                    child.material.transparent = true;
+                    child.material.opacity = 0;
+                }
+            });
+
+            scene.add(avatar);
+
+            // Animation Mixer (if your model has animations)
+            mixer = new THREE.AnimationMixer(avatar);
+            if (gltf.animations.length > 0) {
+                const action = mixer.clipAction(gltf.animations[0]);
+                action.play();
+            } else {
+                // If the model doesn't have animations, create a simple waving animation
+                const arm = avatar.getObjectByName('ArmName');
+                if (arm) {
+                    gsap.to(arm.rotation, {
+                        z: Math.PI / 4,
+                        yoyo: true,
+                        repeat: -1,
+                        duration: 1,
+                        ease: "Sine.easeInOut"
+                    });
+                }
+            }
+
+            // Start the animation loop
+            animate();
+
+            // Add GSAP animation to fade in the avatar
+            fadeInAvatar(avatar);
+        },
+        undefined,
+        function (error) {
+            console.error('Error loading avatar:', error);
+        }
+    );
+
+    function fadeInAvatar(avatar) {
+        // Use GSAP to animate the avatar's opacity along with the overlay text
+        avatar.traverse(function (child) {
+            if (child.isMesh) {
+                gsap.to(child.material, {
+                    opacity: 1,
+                    duration: 1.5,
+                    scrollTrigger: {
+                        trigger: ".overlay",
+                        start: "top center",
+                        end: "center center",
+                        scrub: true,
+                    }
+                });
+            }
+        });
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = clock.getDelta();
+
+        if (mixer) {
+            mixer.update(delta);
         }
 
-        animate();
-    }, undefined, function(error) {
-        console.error('An error occurred while loading the avatar:', error);
-    });
-
-    // Sakura Particles
-    addSakuraParticles();
+        renderer.render(scene, camera);
+    }
 
     // Handle window resize
     window.addEventListener('resize', onWindowResize, false);
-}
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
 
-// Handle window resize
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-// Animation loop
-function animate() {
-    requestAnimationFrame(animate);
-
-    if (mixer) {
-        mixer.update(0.01);
+        renderer.setSize(window.innerWidth, window.innerHeight);
     }
-
-    renderer.render(scene, camera);
 }
-
-// Add sakura petals using particles
-function addSakuraParticles() {
-    const particleCount = 500;
-    const particles = new THREE.BufferGeometry();
-    const positions = [];
-    const velocities = [];
-
-    const sprite = new THREE.TextureLoader().load('assets/sakura.png');
-    const material = new THREE.PointsMaterial({
-        size: 0.5,
-        map: sprite,
-        transparent: true,
-        depthWrite: false
-    });
-
-    for (let i = 0; i < particleCount; i++) {
-        const x = (Math.random() - 0.5) * 20;
-        const y = Math.random() * 10;
-        const z = (Math.random() - 0.5) * 20;
-        positions.push(x, y, z);
-
-        velocities.push(
-            0, // x velocity
-            -Math.random() * 0.02 - 0.01, // y velocity
-            0 // z velocity
-        );
-    }
-
-    particles.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    particles.setAttribute('velocity', new THREE.Float32BufferAttribute(velocities, 3));
-
-    const pointCloud = new THREE.Points(particles, material);
-    scene.add(pointCloud);
-
-    // Animate particles
-    function animateParticles() {
-        const positions = particles.attributes.position.array;
-        const velocities = particles.attributes.velocity.array;
-
-        for (let i = 0; i < particleCount; i++) {
-            const idx = i * 3;
-
-            positions[idx] += velocities[idx];
-            positions[idx + 1] += velocities[idx + 1];
-            positions[idx + 2] += velocities[idx + 2];
-
-            // Reset particle position when it goes off screen
-            if (positions[idx + 1] < -5) {
-                positions[idx + 1] = 5;
-            }
-        }
-
-        particles.attributes.position.needsUpdate = true;
-
-        requestAnimationFrame(animateParticles);
-    }
-
-    animateParticles();
-}
-
-// Scroll-based animations
-gsap.registerPlugin(ScrollTrigger);
-
-gsap.to(camera.position, {
-    z: 2,
-    scrollTrigger: {
-        trigger: ".scroll-content",
-        start: "top top",
-        end: "bottom bottom",
-        scrub: true
-    }
-});
